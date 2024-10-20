@@ -1,4 +1,4 @@
-module shared-commons-go
+module github.com/medfriend/shared-commons-go
 
 go 1.23.2
 
