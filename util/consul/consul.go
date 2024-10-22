@@ -31,7 +31,6 @@ func ConnectToConsul() *api.Client {
 		log.Fatalf("Error converting SERVICE_PORT to int: %v", err)
 	}
 
-	//TODO implementar el healthcheck
 	service := &api.AgentServiceRegistration{
 		ID:      serviceID,
 		Name:    os.Getenv("SERVICE_NAME"),
