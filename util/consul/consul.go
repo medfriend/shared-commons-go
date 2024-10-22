@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 )
 
 func ConnectToConsul() *api.Client {
@@ -25,12 +26,17 @@ func ConnectToConsul() *api.Client {
 		log.Fatalf("Missing required environment variables")
 	}
 
+	port, err := strconv.Atoi(servicePort)
+	if err != nil {
+		log.Fatalf("Error converting SERVICE_PORT to int: %v", err)
+	}
+
 	//TODO implementar el healthcheck
 	service := &api.AgentServiceRegistration{
 		ID:      serviceID,
 		Name:    os.Getenv("SERVICE_NAME"),
 		Address: os.Getenv("SERVICE_ADDRESS"),
-		Port:    8080,
+		Port:    port,
 		//Check: &api.AgentServiceCheck{
 		//	HTTP:     fmt.Sprintf("http://%s:%d/health", serviceAddress, 8080),
 		//	Interval: "10s",
