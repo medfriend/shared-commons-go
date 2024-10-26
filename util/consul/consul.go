@@ -4,12 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/hashicorp/consul/api"
-	"github.com/medfriend/shared-commons-go/util/gorm"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 )
+
+func handleString2int(data string) int {
+	converted, err := strconv.Atoi(data)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return converted
+}
 
 func ConnectToConsulKey(key string) *api.Client {
 
@@ -29,7 +38,7 @@ func ConnectToConsulKey(key string) *api.Client {
 		ID:      result["SERVICE_ID"],
 		Name:    result["SERVICE_NAME"],
 		Address: result["SERVICE_ADDRESS"],
-		Port:    gorm.HandleString2int(result["SERVICE_PORT"]),
+		Port:    handleString2int(result["SERVICE_PORT"]),
 		//Check: &api.AgentServiceCheck{
 		//	HTTP:     fmt.Sprintf("http://%s:%d/health", serviceAddress, 8080),
 		//	Interval: "10s",
