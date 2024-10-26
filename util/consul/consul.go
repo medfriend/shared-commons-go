@@ -79,6 +79,7 @@ func GetServiceAddressAndPort(serviceName string) (string, int, error) {
 }
 
 func StoreKeyValue(client *api.Client, key string, value string) error {
+
 	kv := client.KV()
 
 	p := &api.KVPair{
