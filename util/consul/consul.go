@@ -77,3 +77,20 @@ func GetServiceAddressAndPort(serviceName string) (string, int, error) {
 	service := services[0]
 	return service.Address, service.ServicePort, nil
 }
+
+func StoreKeyValue(client *api.Client, key string, value string) error {
+	kv := client.KV()
+
+	p := &api.KVPair{
+		Key:   key,
+		Value: []byte(value),
+	}
+
+	_, err := kv.Put(p, nil)
+	if err != nil {
+		return fmt.Errorf("error storing key-value pair in Consul: %v", err)
+	}
+
+	fmt.Printf("Stored key-value pair: %s=%s\n", key, value)
+	return nil
+}
