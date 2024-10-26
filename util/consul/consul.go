@@ -94,3 +94,20 @@ func StoreKeyValue(client *api.Client, key string, value string) error {
 	fmt.Printf("Stored key-value pair: %s=%s\n", key, value)
 	return nil
 }
+
+func GetKeyValue(client *api.Client, key string) (string, error) {
+	kv := client.KV()
+
+	pair, _, err := kv.Get(key, nil)
+	if err != nil {
+		return "", fmt.Errorf("error retrieving key-value pair from Consul: %v", err)
+	}
+
+	if pair == nil {
+		return "", fmt.Errorf("key %s not found in Consul", key)
+	}
+
+	value := string(pair.Value)
+	fmt.Printf("Retrieved key-value pair: %s=%s\n", key, value)
+	return value, nil
+}
