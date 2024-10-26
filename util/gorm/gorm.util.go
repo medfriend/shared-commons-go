@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func handleString2int(data string) int {
+func HandleString2int(data string) int {
 	converted, err := strconv.Atoi(data)
 
 	if err != nil {
@@ -47,9 +47,9 @@ func InitDB(db *gorm.DB, consulClient *api.Client) (*gorm.DB, error) {
 		log.Fatalf("Error obteniendo la conexión de base de datos: %v", err)
 	}
 
-	sqlDB.SetMaxOpenConns(handleString2int(result["MAX_OPEN_CONN"]))                       // Máximo número de conexiones abiertas
-	sqlDB.SetMaxIdleConns(handleString2int(result["MAX_IDLE_CONN"]))                       // Máximo número de conexiones inactivas
-	sqlDB.SetConnMaxLifetime(time.Duration(handleString2int(result["MAX_LIFETIME_CONN"]))) // Tiempo de vida máximo de una conexión
+	sqlDB.SetMaxOpenConns(HandleString2int(result["MAX_OPEN_CONN"]))                       // Máximo número de conexiones abiertas
+	sqlDB.SetMaxIdleConns(HandleString2int(result["MAX_IDLE_CONN"]))                       // Máximo número de conexiones inactivas
+	sqlDB.SetConnMaxLifetime(time.Duration(HandleString2int(result["MAX_LIFETIME_CONN"]))) // Tiempo de vida máximo de una conexión
 
 	fmt.Println("Conexión a la base de datos exitosa")
 

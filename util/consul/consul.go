@@ -1,13 +1,52 @@
 package consul
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/hashicorp/consul/api"
+	"github.com/medfriend/shared-commons-go/util/gorm"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 )
+
+func ConnectToConsulKey(key string) *api.Client {
+
+	client, err := api.NewClient(api.DefaultConfig())
+
+	dbString, _ := GetKeyValue(client, key)
+
+	var result map[string]string
+
+	err = json.Unmarshal([]byte(dbString), &result)
+
+	if err != nil {
+		log.Fatalf("Error converting JSON string to map: %v", err)
+	}
+
+	service := &api.AgentServiceRegistration{
+		ID:      result["SERVICE_ID"],
+		Name:    result["SERVICE_NAME"],
+		Address: result["SERVICE_ADDRESS"],
+		Port:    gorm.HandleString2int(result["SERVICE_PORT"]),
+		//Check: &api.AgentServiceCheck{
+		//	HTTP:     fmt.Sprintf("http://%s:%d/health", serviceAddress, 8080),
+		//	Interval: "10s",
+		//	Timeout:  "5s",
+		//},
+	}
+
+	err = client.Agent().ServiceRegister(service)
+
+	if err != nil {
+		log.Fatalf("Error registering service: %v", err)
+	}
+
+	fmt.Println("Service registered successfully")
+
+	return client
+}
 
 func ConnectToConsul() *api.Client {
 
