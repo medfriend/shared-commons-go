@@ -34,7 +34,7 @@ func InitDB(db *gorm.DB, consulClient *api.Client) (*gorm.DB, error) {
 		log.Fatalf("Error converting JSON string to map: %v", err)
 	}
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC preferSimpleProtocol=true",
 		result["DB_HOST"], result["DB_USER"], result["DB_PASSWORD"], result["DB_NAME"], result["DB_PORT"])
 
 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
