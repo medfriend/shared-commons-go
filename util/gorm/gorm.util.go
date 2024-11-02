@@ -22,9 +22,15 @@ func HandleString2int(data string) int {
 	return converted
 }
 
-func InitDB(db *gorm.DB, consulClient *api.Client) (*gorm.DB, error) {
+func InitDB(db *gorm.DB, consulClient *api.Client, connectionType string) (*gorm.DB, error) {
 
-	dbString, _ := consul.GetKeyValue(consulClient, "DB")
+	dbKey := "DB"
+
+	if connectionType == "LOCAL" {
+		dbKey = "DB_LOCAL"
+	}
+
+	dbString, _ := consul.GetKeyValue(consulClient, dbKey)
 
 	var result map[string]string
 
@@ -34,7 +40,7 @@ func InitDB(db *gorm.DB, consulClient *api.Client) (*gorm.DB, error) {
 		log.Fatalf("Error converting JSON string to map: %v", err)
 	}
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC preferSimpleProtocol=true prepareThreshold=0",
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
 		result["DB_HOST"], result["DB_USER"], result["DB_PASSWORD"], result["DB_NAME"], result["DB_PORT"])
 
 	fmt.Println("conn to db ", dsn)
