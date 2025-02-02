@@ -22,13 +22,15 @@ func HandleString2int(data string) int {
 	return converted
 }
 
-func InitDB(db *gorm.DB, consulClient *api.Client, connectionType string) (*gorm.DB, error) {
+func InitDB(db *gorm.DB, consulClient *api.Client, connectionType string, service string) (*gorm.DB, error) {
 
 	dbKey := "DB"
 
 	if connectionType == "LOCAL" {
 		dbKey = "DB_LOCAL"
 	}
+
+	dbName := fmt.Sprintf("DB_NAME_%s", service)
 
 	dbString, _ := consul.GetKeyValue(consulClient, dbKey)
 
@@ -41,7 +43,7 @@ func InitDB(db *gorm.DB, consulClient *api.Client, connectionType string) (*gorm
 	}
 
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
-		result["DB_HOST"], result["DB_USER"], result["DB_PASSWORD"], result["DB_NAME"], result["DB_PORT"])
+		result["DB_HOST"], result["DB_USER"], result["DB_PASSWORD"], result[dbName], result["DB_PORT"])
 
 	fmt.Println("conn to db ", dsn)
 
