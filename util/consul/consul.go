@@ -66,9 +66,18 @@ func ConnectToConsulKey(addressDeploy, key string) *api.Client {
 	return client
 }
 
-func ConnectToConsul() *api.Client {
+func ConnectToConsul(addressDeploy string) *api.Client {
 
-	client, err := api.NewClient(api.DefaultConfig())
+	config := api.DefaultConfig()
+
+	if addressDeploy != "" {
+		config.Address = addressDeploy
+	} else {
+		// Usar la configuración por defecto de Consul
+		log.Println("Usando configuración por defecto de Consul:", config.Address)
+	}
+
+	client, err := api.NewClient(config)
 
 	if err != nil {
 		log.Fatalf("Error creating consul client: %v", err)
