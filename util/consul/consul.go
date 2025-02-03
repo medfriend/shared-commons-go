@@ -20,9 +20,18 @@ func handleString2int(data string) int {
 	return converted
 }
 
-func ConnectToConsulKey(key string) *api.Client {
+func ConnectToConsulKey(addressDeploy, key string) *api.Client {
 
-	client, err := api.NewClient(api.DefaultConfig())
+	config := api.DefaultConfig()
+
+	if addressDeploy != "" {
+		config.Address = addressDeploy
+	} else {
+		// Usar la configuración por defecto de Consul
+		log.Println("Usando configuración por defecto de Consul:", config.Address)
+	}
+
+	client, err := api.NewClient(config)
 
 	dbString, _ := GetKeyValue(client, key)
 
