@@ -42,8 +42,9 @@ var microserviceCmd = &cobra.Command{
 		fmt.Println("Todos los directorios han sido creados exitosamente.")
 
 		files.WriteToFile(dirName+"/main.go", template.GetMain(args))
-
+		files.WriteToFile(dirName+"/.env", template.GetEnv(args))
 		files.WriteToFile(dirName+"/httpServer/httpServer.go", template.GetHttpServerTemplate(args))
+		files.WriteToFile(dirName+"/router/admin.router.go", template.GetAdminRouter(args))
 
 		pwd, err := os.Getwd()
 		if err != nil {
