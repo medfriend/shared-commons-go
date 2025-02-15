@@ -16,7 +16,7 @@ func ConnZMQ(consulClient *api.Client, service string) *zmq4.Socket {
 
 	err := json.Unmarshal([]byte(serviceInfo), &resultServiceInfo)
 	zmqPort := resultServiceInfo["SERVICE_PORT"]
-	zmqHost := resultServiceInfo["SERVICE_HOST"]
+	zmqHost := resultServiceInfo["SERVICE_PATH"]
 
 	socket, err := zmq4.NewSocket(zmq4.PULL)
 	if err != nil {
