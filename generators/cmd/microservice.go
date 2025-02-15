@@ -44,7 +44,7 @@ var microserviceCmd = &cobra.Command{
 		files.WriteToFile(dirName+"/main.go", template.GetMain(args))
 		files.WriteToFile(dirName+"/.env", template.GetEnv(args))
 		files.WriteToFile(dirName+"/httpServer/httpServer.go", template.GetHttpServerTemplate(args))
-		files.WriteToFile(dirName+"/router/admin.router.go", template.GetAdminRouter(args))
+		files.WriteToFile(dirName+"/router/admin.router.go", template.GetAdminRoute(args))
 
 		pwd, err := os.Getwd()
 		if err != nil {
@@ -84,6 +84,15 @@ func executeCommand(command string, args ...string) error {
 	cmd := exec.Command(command, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func executeCommandInDir(dir, command string, args ...string) error {
+	cmd := exec.Command(command, args...)
+	cmd.Dir = dir // Establece el directorio donde se ejecutará el comando
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
 	return cmd.Run()
 }
 

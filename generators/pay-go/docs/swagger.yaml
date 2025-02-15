@@ -1,0 +1,178 @@
+basePath: /medfri-pay
+definitions:
+  entity.Card:
+    type: object
+host: localhost:pay
+info:
+  contact:
+    email: soporte@api.com
+    name: Soporte de API
+    url: http://www.soporte-api.com
+  description: micro de 9000.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: medfri-pay
+  version: "1.0"
+paths:
+  /Card:
+    post:
+      consumes:
+      - application/json
+      description: Este endpoint permite crear una nueva entidad en el sistema.
+      parameters:
+      - description: Información de la entidad
+        in: body
+        name: Card
+        required: true
+        schema:
+          $ref: '#/definitions/entity.Card'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Card creada con éxito
+          schema:
+            $ref: '#/definitions/entity.Card'
+        "400":
+          description: Error en el cuerpo de la solicitud
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Crear una entidad
+      tags:
+      - entidades
+    put:
+      consumes:
+      - application/json
+      description: Este endpoint permite actualizar la información de una entidad
+        existente.
+      parameters:
+      - description: Información de la entidad actualizada
+        in: body
+        name: Card
+        required: true
+        schema:
+          $ref: '#/definitions/entity.Card'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Card actualizada con éxito
+          schema:
+            $ref: '#/definitions/entity.Card'
+        "400":
+          description: Error en el cuerpo de la solicitud
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Actualizar una entidad
+      tags:
+      - entidades
+  /Card/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Este endpoint permite eliminar una entidad específica usando su
+        ID.
+      parameters:
+      - description: ID de la entidad
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Card eliminada con éxito
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Eliminar una entidad
+      tags:
+      - entidades
+    get:
+      consumes:
+      - application/json
+      description: Este endpoint permite obtener la información de una entidad específica
+        usando su ID.
+      parameters:
+      - description: ID de la entidad
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Card encontrada
+          schema:
+            $ref: '#/definitions/entity.Card'
+        "404":
+          description: Card no encontrada
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener una entidad por ID
+      tags:
+      - entidades
+  /Card/all:
+    get:
+      consumes:
+      - application/json
+      description: Este endpoint obtener todas las entidades
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cards encontradas
+          schema:
+            items:
+              $ref: '#/definitions/entity.Card'
+            type: array
+        "404":
+          description: Cards no encontradas
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener todas las entidades
+      tags:
+      - entidades
+securityDefinitions:
+  BearerAuth:
+    description: Ingresa "Bearer {token}" para autenticar.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

@@ -1,0 +1,273 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "micro de 9000.",
+        "title": "medfri-pay",
+        "contact": {
+            "name": "Soporte de API",
+            "url": "http://www.soporte-api.com",
+            "email": "soporte@api.com"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:pay",
+    "basePath": "/medfri-pay",
+    "paths": {
+        "/Card": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Este endpoint permite actualizar la información de una entidad existente.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "entidades"
+                ],
+                "summary": "Actualizar una entidad",
+                "parameters": [
+                    {
+                        "description": "Información de la entidad actualizada",
+                        "name": "Card",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/entity.Card"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Card actualizada con éxito",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Card"
+                        }
+                    },
+                    "400": {
+                        "description": "Error en el cuerpo de la solicitud",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error interno del servidor",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Este endpoint permite crear una nueva entidad en el sistema.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "entidades"
+                ],
+                "summary": "Crear una entidad",
+                "parameters": [
+                    {
+                        "description": "Información de la entidad",
+                        "name": "Card",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/entity.Card"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Card creada con éxito",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Card"
+                        }
+                    },
+                    "400": {
+                        "description": "Error en el cuerpo de la solicitud",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error interno del servidor",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/Card/all": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Este endpoint obtener todas las entidades",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "entidades"
+                ],
+                "summary": "Obtener todas las entidades",
+                "responses": {
+                    "200": {
+                        "description": "Cards encontradas",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.Card"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Cards no encontradas",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/Card/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Este endpoint permite obtener la información de una entidad específica usando su ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "entidades"
+                ],
+                "summary": "Obtener una entidad por ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de la entidad",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Card encontrada",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Card"
+                        }
+                    },
+                    "404": {
+                        "description": "Card no encontrada",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Este endpoint permite eliminar una entidad específica usando su ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "entidades"
+                ],
+                "summary": "Eliminar una entidad",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de la entidad",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Card eliminada con éxito"
+                    },
+                    "500": {
+                        "description": "Error interno del servidor",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "entity.Card": {
+            "type": "object"
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Ingresa \"Bearer {token}\" para autenticar.",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

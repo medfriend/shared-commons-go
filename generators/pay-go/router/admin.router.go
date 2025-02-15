@@ -1,7 +1,4 @@
-package template
-
-func GetAdminRoute(args []string) string {
-	return `package router
+package router
 
 import (
 	"github.com/gin-gonic/gin"
@@ -20,5 +17,4 @@ func InitializeAllRouters(api *gin.RouterGroup, db *gorm.DB) {
 	for _, initFunc := range routerInits {
 		initFunc(api, db)
 	}
-}`
 }
