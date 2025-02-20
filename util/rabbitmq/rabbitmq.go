@@ -59,7 +59,7 @@ func (r *RabbitMQ) SendMessage(queueName string, message string, rabbitConn stri
 	// Declarar la cola
 	_, err := r.ch.QueueDeclare(
 		queueName, // Nombre de la cola
-		false,     // Duradera
+		true,      // Duradera
 		false,     // Autodelete
 		false,     // Exclusiva
 		false,     // Sin esperar
