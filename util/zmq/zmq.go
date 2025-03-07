@@ -8,31 +8,36 @@ import (
 	"github.com/pebbe/zmq4"
 )
 
-func ConnZMQ(consulClient *api.Client, service string) *zmq4.Socket {
-
-	serviceInfo, _ := consul.GetKeyValue(consulClient, service)
+func ConnZMQ(consulClient *api.Client, service string) (*zmq4.Socket, error) {
+	serviceInfo, err := consul.GetKeyValue(consulClient, service)
+	if err != nil {
+		return nil, err
+	}
 
 	var resultServiceInfo map[string]string
+	err = json.Unmarshal([]byte(serviceInfo), &resultServiceInfo)
+	if err != nil {
+		return nil, err
+	}
 
-	err := json.Unmarshal([]byte(serviceInfo), &resultServiceInfo)
 	zmqPort := resultServiceInfo["SERVICE_PORT"]
 	zmqHost := resultServiceInfo["SERVICE_PATH"]
 
 	socket, err := zmq4.NewSocket(zmq4.PULL)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	defer socket.Close()
 
 	zmqConn := fmt.Sprintf("tcp://%s:%s", zmqHost, zmqPort)
 
 	// Conectar al servidor PUSH
 	err = socket.Connect(zmqConn)
 	if err != nil {
-		panic(err)
+		socket.Close() // Close the socket if connect fails
+		return nil, err
 	}
 
 	fmt.Println(fmt.Sprintf("Connected to %s", zmqConn))
 
-	return socket
+	return socket, nil
 }
