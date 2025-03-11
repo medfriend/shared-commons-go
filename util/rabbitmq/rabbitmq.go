@@ -50,31 +50,37 @@ func (r *RabbitMQ) ensureConnection(rabbitConn string) {
 }
 
 // SendMessage envía un mensaje a la cola especificada
-func (r *RabbitMQ) SendMessage(queueName string, message string, rabbitConn string) {
+func (r *RabbitMQ) SendMessage(queueName string, message string, rabbitConn string, exchangeType string, routingKey string) {
 	r.ensureConnection(rabbitConn) // Verifica la conexión antes de enviar
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Declarar la cola
-	_, err := r.ch.QueueDeclare(
-		queueName, // Nombre de la cola
-		true,      // Duradera
-		false,     // Autodelete
-		false,     // Exclusiva
-		false,     // Sin esperar
-		nil,       // Argumentos adicionales
+	// Declarar el exchange basado en el tipo proporcionado
+	err := r.ch.ExchangeDeclare(
+		queueName,    // Nombre del exchange
+		exchangeType, // Tipo de exchange: "direct" o "fanout"
+		true,         // Duradero
+		false,        // Autodelete
+		false,        // Exclusivo
+		false,        // Sin esperar
+		nil,          // Argumentos adicionales
 	)
 	if err != nil {
-		log.Fatalf("Error al declarar la cola: %s", err)
+		log.Fatalf("Error al declarar el exchange: %s", err)
+	}
+
+	// Si el exchange es de tipo 'fanout', ignora la clave de enrutamiento porque no es necesaria
+	if exchangeType == "fanout" {
+		routingKey = "" // En fanout, la clave de enrutamiento no se usa
 	}
 
 	// Enviar un mensaje
 	err = r.ch.Publish(
-		"",        // Intercambio
-		queueName, // Clave de enrutamiento
-		false,     // Requiere confirmación de entrega
-		false,     // Exclusivo
+		queueName,  // Nombre del exchange
+		routingKey, // Clave de enrutamiento, se usa con 'direct' exchange
+		false,      // Requiere confirmación de entrega
+		false,      // Exclusivo
 		amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        []byte(message),
@@ -82,7 +88,6 @@ func (r *RabbitMQ) SendMessage(queueName string, message string, rabbitConn stri
 	if err != nil {
 		log.Fatalf("Error al enviar el mensaje: %s", err)
 	}
-
 }
 
 // Close cierra la conexión y el canal
