@@ -50,7 +50,7 @@ func (r *RabbitMQ) ensureConnection(rabbitConn string) {
 }
 
 // SendMessage envía un mensaje a la cola especificada
-func (r *RabbitMQ) SendMessage(queueName string, message string, rabbitConn string, exchangeType string, routingKey string) {
+func (r *RabbitMQ) SendMessage(queueName string, message string, rabbitConn string, exchangeType string, routingKey string, exchangeName string) {
 	r.ensureConnection(rabbitConn) // Verifica la conexión antes de enviar
 
 	r.mu.Lock()
@@ -58,7 +58,7 @@ func (r *RabbitMQ) SendMessage(queueName string, message string, rabbitConn stri
 
 	// Declarar el exchange basado en el tipo proporcionado
 	err := r.ch.ExchangeDeclare(
-		queueName,    // Nombre del exchange
+		exchangeName, // Nombre del exchange
 		exchangeType, // Tipo de exchange: "direct" o "fanout"
 		true,         // Duradero
 		false,        // Autodelete
@@ -74,6 +74,24 @@ func (r *RabbitMQ) SendMessage(queueName string, message string, rabbitConn stri
 	if exchangeType == "fanout" {
 		routingKey = "" // En fanout, la clave de enrutamiento no se usa
 	}
+
+	_, err = r.ch.QueueDeclare(
+		queueName, // nombre de la cola
+		true,      // durable
+		false,     // delete when unused
+		false,     // exclusive
+		false,     // no-wait
+		nil,       // argumentos adicionales
+	)
+
+	// Vincular la cola al exchange
+	err = r.ch.QueueBind(
+		queueName,    // nombre de la cola
+		routingKey,   // clave de enrutamiento
+		exchangeName, // nombre del exchange
+		false,        // no-wait
+		nil,          // argumentos adicionales
+	)
 
 	// Enviar un mensaje
 	err = r.ch.Publish(
