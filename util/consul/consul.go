@@ -138,9 +138,9 @@ func GetServiceAddressAndPort(client *api.Client, serviceName string) (string, i
 
 	service := services[0]
 
-	fmt.Println(service.ID)
+	fmt.Println(service.ServiceName)
 
-	dbString, _ := GetKeyValue(client, service.ID)
+	dbString, _ := GetKeyValue(client, service.ServiceName)
 
 	var result map[string]string
 
