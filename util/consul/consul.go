@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func handleString2int(data string) int {
@@ -140,7 +141,8 @@ func GetServiceAddressAndPort(client *api.Client, serviceName string) (string, i
 
 	fmt.Println(service.ServiceName)
 
-	dbString, _ := GetKeyValue(client, service.ServiceName)
+	parts := strings.Split(service.ServiceName, "-")
+	dbString, _ := GetKeyValue(client, strings.ToUpper(parts[1]))
 
 	var result map[string]string
 
