@@ -125,11 +125,7 @@ func HealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Service is healthy"))
 }
 
-func GetServiceAddressAndPort(serviceName string) (string, int, error) {
-	client, err := api.NewClient(api.DefaultConfig())
-	if err != nil {
-		return "", 0, fmt.Errorf("error creating Consul client: %v", err)
-	}
+func GetServiceAddressAndPort(client *api.Client, serviceName string) (string, int, error) {
 
 	services, _, err := client.Catalog().Service(serviceName, "", nil)
 	if err != nil {
