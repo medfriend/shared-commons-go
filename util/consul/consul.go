@@ -137,7 +137,16 @@ func GetServiceAddressAndPort(client *api.Client, serviceName string) (string, i
 	}
 
 	service := services[0]
-	return service.Address, service.ServicePort, nil
+
+	fmt.Println(service.ID)
+
+	dbString, _ := GetKeyValue(client, service.ID)
+
+	var result map[string]string
+
+	err = json.Unmarshal([]byte(dbString), &result)
+
+	return result["SERVICE_ADDRESS"], service.ServicePort, nil
 }
 
 func StoreKeyValue(client *api.Client, key string, value string) error {
