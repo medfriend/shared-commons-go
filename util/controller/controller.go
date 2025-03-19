@@ -36,8 +36,8 @@ func HandlerInternalError(c *gin.Context, err error) bool {
 	return false
 }
 
-func HandlerCreatedSuccess(c *gin.Context, data interface{}) {
-	c.JSON(http.StatusCreated, gin.H{"data": data})
+func HandlerCreatedSuccess(c *gin.Context, data interface{}, collectioId uint) {
+	c.JSON(http.StatusCreated, gin.H{"data": data, "collectio_id": collectioId})
 }
 
 func HandlerFound(c *gin.Context, data interface{}) {
