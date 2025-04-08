@@ -15,5 +15,5 @@ con el ultimo se puede obtener la ultima verion
 git tag vx.x.x
 ```
 ```
-git push tag vx.x.x
+git push origin vx.x.x
 ```
