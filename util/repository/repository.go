@@ -2,13 +2,38 @@ package repository
 
 import (
 	"fmt"
+	"github.com/medfriend/shared-commons-go/dto"
 	"gorm.io/gorm"
+	"math"
 	"reflect"
 	"sync"
 )
 
 type BaseRepository[T any] struct {
 	DB *gorm.DB
+}
+
+func (r *BaseRepository[T]) Pagination(paginacion dto.PaginationDTO) (dto.PaginatedResponse, error) {
+
+	var entities []T
+	var totalRows int64
+
+	r.DB.Model(new(T)).Count(&totalRows)
+	offset := (paginacion.Pagina - 1) * paginacion.Filas
+
+	err := r.DB.Limit(int(paginacion.Filas)).Offset(int(offset)).Find(&entities).Error
+
+	totalPages := int(math.Ceil(float64(totalRows) / float64(paginacion.Filas)))
+
+	paginacionResponse := dto.PaginatedResponse{
+		Data:       entities,
+		Total:      totalRows,
+		Page:       int(paginacion.Pagina),
+		PageSize:   int(paginacion.Filas),
+		TotalPages: totalPages,
+	}
+
+	return paginacionResponse, err
 }
 
 func (r *BaseRepository[T]) Save(entity *T) error {
