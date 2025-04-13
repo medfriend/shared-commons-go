@@ -75,23 +75,26 @@ func (r *BaseRepository[T]) FindByIdWithRelations(id uint, relations ...string) 
 	return &entity, nil
 }
 
-func (r *BaseRepository[T]) FindAnyField(fields []string, query string) (*[]T, error) {
+func (r *BaseRepository[T]) FindAnyField(fields []string, query string, castFields map[string]bool) (*[]T, error) {
 	var results []T
 
 	if len(fields) == 0 {
 		return nil, fmt.Errorf("no fields provided to search")
 	}
 
-	dbQuery := r.DB
+	dbQuery := r.DB.Distinct()
 	for i, field := range fields {
-		// Usamos `OR` para buscar en múltiples campos
-		if i == 0 {
-			fmt.Println()
-			dbQuery = dbQuery.Where(fmt.Sprintf("%s ILIKE ?", field), "%"+query+"%")
-		} else {
-			dbQuery = dbQuery.Or(fmt.Sprintf("%s ILIKE ?", field), "%"+query+"%")
+		fieldExpr := field
+		if castFields[field] {
+			fieldExpr = fmt.Sprintf("CAST(%s AS TEXT)", field)
 		}
-		fmt.Println(dbQuery)
+
+		condition := fmt.Sprintf("%s ILIKE ?", fieldExpr)
+		if i == 0 {
+			dbQuery = dbQuery.Where(condition, "%"+query+"%")
+		} else {
+			dbQuery = dbQuery.Or(condition, "%"+query+"%")
+		}
 	}
 
 	if err := dbQuery.Find(&results).Error; err != nil {
