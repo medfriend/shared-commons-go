@@ -13,7 +13,7 @@ type Claims struct {
 		Usuario   int `json:"usuario"`
 		UsuarioID int `json:"usuario_id"`
 	} `json:"user"`
-	EntidadId string `json:"entidadId"`
+	EntidadId int `json:"entidadId"`
 	jwt.StandardClaims
 }
 
