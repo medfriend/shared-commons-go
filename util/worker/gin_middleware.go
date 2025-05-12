@@ -17,6 +17,12 @@ func SetGlobalWorkerPool(pool *WorkerPool) {
 	globalWorkerPool = pool
 }
 
+// GetGlobalWorkerPool retorna el pool de workers global configurado
+// Retorna nil si no hay ningún pool configurado
+func GetGlobalWorkerPool() *WorkerPool {
+	return globalWorkerPool
+}
+
 // WorkerPoolMiddleware distribuye las solicitudes entrantes al pool de workers
 // Parámetros:
 // - pool: el pool de workers a utilizar (si es nil, usará el global)
