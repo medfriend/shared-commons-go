@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"github.com/hashicorp/consul/api"
 	"github.com/medfriend/shared-commons-go/util/consul"
+	"github.com/medfriend/shared-commons-go/util/logger"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"log"
+	"go.uber.org/zap"
 )
 
 func CONN(consulClient *api.Client) *minio.Client {
@@ -25,27 +26,27 @@ func CONN(consulClient *api.Client) *minio.Client {
 	secretAccessKey := minioInfoResult["MINIO_SECRET"]
 	useSSL := false
 
-	fmt.Println(minioInfoResult)
+	logger.GetLogger().Debug("Información MinIO obtenida", zap.Any("config", minioInfoResult))
 
 	minioClient, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
 		Secure: useSSL,
 	})
 	if err != nil {
-		log.Fatalln(err)
+		logger.GetLogger().Fatal("Error al crear cliente MinIO", zap.Error(err))
 	}
 
-	log.Printf("Conectado a MinIO en %s\n", endpoint)
+	logger.GetLogger().Info("Conectado a MinIO", zap.String("endpoint", endpoint))
 
 	// Listar todos los buckets
 	ctx := context.Background()
 	buckets, err := minioClient.ListBuckets(ctx)
 	if err != nil {
-		log.Fatalln(err)
+		logger.GetLogger().Fatal("Error al listar buckets", zap.Error(err))
 	}
 
 	for _, bucket := range buckets {
-		log.Printf("Bucket encontrado: %s\n", bucket.Name)
+		logger.GetLogger().Info("Bucket encontrado", zap.String("bucket", bucket.Name))
 	}
 
 	return minioClient

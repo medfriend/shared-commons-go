@@ -2,7 +2,8 @@ package worker
 
 import (
 	"context"
-	"log"
+	"github.com/medfriend/shared-commons-go/util/logger"
+	"go.uber.org/zap"
 	"net/http"
 	"runtime"
 	"sync"
@@ -46,7 +47,7 @@ type JobProcessor func(*http.Request) *http.Response
 
 // DefaultJobProcessor es un procesador básico que siempre retorna 200 OK
 var DefaultJobProcessor = func(req *http.Request) *http.Response {
-	log.Printf("Procesando solicitud: %s (procesador por defecto)", req.URL.Path)
+	logger.GetLogger().Info("Procesando solicitud con procesador por defecto", zap.String("path", req.URL.Path))
 	return &http.Response{
 		StatusCode: http.StatusOK,
 		Status:     "200 OK",
@@ -109,7 +110,9 @@ func (p *WorkerPool) MonitorWorkers() {
 					busyCount++
 					duration := time.Since(worker.StartTime)
 					if duration > 30*time.Second {
-						log.Printf("Worker %d ha estado ocupado durante %v segundos", worker.ID, duration.Seconds())
+						logger.GetLogger().Warn("Worker ocupado por mucho tiempo",
+						zap.Int("worker_id", worker.ID),
+						zap.Float64("duracion_segundos", duration.Seconds()))
 					}
 				}
 				worker.BusyMu.Unlock()
@@ -153,7 +156,7 @@ func (p *WorkerPool) SubmitJob(req *http.Request, timeoutMillis int64) chan *htt
 	default:
 		// Cola llena, manejar rechazo
 		cancel()
-		log.Printf("Cola de trabajos llena, rechazando solicitud: %s", req.URL.Path)
+		logger.GetLogger().Warn("Cola de trabajos llena, rechazando solicitud", zap.String("path", req.URL.Path))
 		resp := &http.Response{
 			StatusCode: http.StatusServiceUnavailable,
 			Status:     "503 Service Unavailable",
@@ -194,10 +197,10 @@ func (p *WorkerPool) SubmitBackgroundJob(req *http.Request, timeoutMillis int64)
 		// Intentar enviar el trabajo con un timeout corto
 		select {
 		case p.JobQueue <- job:
-			log.Printf("Trabajo en segundo plano enviado para: %s", req.URL.Path)
+			logger.GetLogger().Debug("Trabajo en segundo plano enviado", zap.String("path", req.URL.Path))
 		case <-time.After(100 * time.Millisecond): // Timeout corto para no bloquear
 			cancel()
-			log.Printf("No se pudo encolar el trabajo en segundo plano: %s", req.URL.Path)
+			logger.GetLogger().Warn("No se pudo encolar el trabajo en segundo plano", zap.String("path", req.URL.Path))
 			close(dummyResponseChan)
 		}
 	}()
@@ -236,13 +239,13 @@ func (p *WorkerPool) GetWorkerStats() map[string]interface{} {
 func (p *WorkerPool) Shutdown() {
 	close(p.StopChan)
 	p.Wg.Wait()
-	log.Println("Worker pool apagado correctamente")
+	logger.GetLogger().Info("Worker pool apagado correctamente")
 }
 
 // Start comienza el ciclo de procesamiento del worker
 func (w *Worker) Start(wg *sync.WaitGroup, processor JobProcessor) {
 	defer wg.Done()
-	log.Printf("Worker %d iniciado", w.ID)
+	logger.GetLogger().Debug("Worker iniciado", zap.Int("worker_id", w.ID))
 
 	for {
 		select {
@@ -266,7 +269,7 @@ func (w *Worker) Start(wg *sync.WaitGroup, processor JobProcessor) {
 			w.BusyMu.Unlock()
 
 		case <-w.StopChan:
-			log.Printf("Worker %d detenido", w.ID)
+			logger.GetLogger().Debug("Worker detenido", zap.Int("worker_id", w.ID))
 			return
 		}
 	}
@@ -286,7 +289,9 @@ func (w *Worker) ProcessJob(job *JobContext, processor JobProcessor) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Worker %d recuperado de pánico: %v", w.ID, r)
+			logger.GetLogger().Error("Worker recuperado de pánico",
+			zap.Int("worker_id", w.ID),
+			zap.Any("panic", r))
 
 			// Cerrar el canal de respuesta si aún está abierto
 			select {
@@ -308,22 +313,28 @@ func (w *Worker) ProcessJob(job *JobContext, processor JobProcessor) {
 	// Comprobar si el contexto ya ha expirado
 	select {
 	case <-job.Context.Done():
-		log.Printf("Worker %d: trabajo cancelado antes de procesamiento: %v", w.ID, job.Context.Err())
+		logger.GetLogger().Warn("Trabajo cancelado antes de procesamiento",
+		zap.Int("worker_id", w.ID),
+		zap.Error(job.Context.Err()))
 		return
 	default:
 		// Continuar procesamiento
 	}
 
 	startTime := time.Now()
-	log.Printf("Worker %d procesando solicitud: %s", w.ID, job.Request.URL.Path)
+	logger.GetLogger().Debug("Worker procesando solicitud",
+		zap.Int("worker_id", w.ID),
+		zap.String("path", job.Request.URL.Path))
 
 	// Procesar la solicitud utilizando el procesador proporcionado
 	response := processor(job.Request)
 
 	// Medir tiempo de procesamiento
 	elapsedMs := time.Since(startTime).Milliseconds()
-	log.Printf("Worker %d completó el procesamiento en %d ms para: %s",
-		w.ID, elapsedMs, job.Request.URL.Path)
+	logger.GetLogger().Debug("Worker completó el procesamiento",
+		zap.Int("worker_id", w.ID),
+		zap.Int64("duracion_ms", elapsedMs),
+		zap.String("path", job.Request.URL.Path))
 
 	// Enviar respuesta al canal
 	job.ResponseChan <- response
@@ -341,11 +352,13 @@ func CreateWorkers(numWorkers int, stop chan struct{}, taskQueue chan *http.Requ
 				select {
 				case req := <-taskQueue:
 					if req != nil {
-						log.Printf("Worker legacy %d procesando solicitud para: %s", id, req.URL.Path)
+						logger.GetLogger().Debug("Worker legacy procesando solicitud",
+						zap.Int("worker_id", id),
+						zap.String("path", req.URL.Path))
 					}
 
 				case <-stop:
-					log.Printf("Worker legacy %d shutting down", id)
+					logger.GetLogger().Debug("Worker legacy apagándose", zap.Int("worker_id", id))
 					return
 				}
 			}
@@ -358,5 +371,5 @@ func CreateWorkers(numWorkers int, stop chan struct{}, taskQueue chan *http.Requ
 func HandleShutdown(stop chan struct{}, client interface{}) {
 	// Este es un placeholder simplificado para mantener compatibilidad
 	// La implementación real sería específica para cada aplicación
-	log.Println("Legacy shutdown handler registered")
+	logger.GetLogger().Debug("Legacy shutdown handler registered")
 }

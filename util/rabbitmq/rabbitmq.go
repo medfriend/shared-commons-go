@@ -1,8 +1,9 @@
 package rabbitmq
 
 import (
+	"github.com/medfriend/shared-commons-go/util/logger"
 	"github.com/streadway/amqp"
-	"log"
+	"go.uber.org/zap"
 	"sync"
 )
 
@@ -32,19 +33,19 @@ func (r *RabbitMQ) connect(rabbitConn string) {
 	var err error
 	r.conn, err = amqp.Dial(rabbitConn)
 	if err != nil {
-		log.Fatalf("Error al conectar a RabbitMQ: %s", err)
+		logger.GetLogger().Fatal("Error al conectar a RabbitMQ", zap.Error(err))
 	}
 
 	r.ch, err = r.conn.Channel()
 	if err != nil {
-		log.Fatalf("Error al abrir un canal: %s", err)
+		logger.GetLogger().Fatal("Error al abrir un canal", zap.Error(err))
 	}
 }
 
 // ensureConnection verifica y restablece la conexión si está cerrada
 func (r *RabbitMQ) ensureConnection(rabbitConn string) {
 	if r.conn == nil || r.conn.IsClosed() || r.ch == nil {
-		log.Println("Conexión o canal cerrado, reconectando...")
+		logger.GetLogger().Info("Conexión o canal cerrado, reconectando...")
 		r.connect(rabbitConn)
 	}
 }
@@ -66,7 +67,7 @@ func (r *RabbitMQ) SendMessage(queueName string, message string, rabbitConn stri
 		nil,       // Argumentos adicionales
 	)
 	if err != nil {
-		log.Fatalf("Error al declarar la cola: %s", err)
+		logger.GetLogger().Fatal("Error al declarar la cola", zap.String("queue", queueName), zap.Error(err))
 	}
 
 	// Enviar un mensaje
@@ -80,7 +81,7 @@ func (r *RabbitMQ) SendMessage(queueName string, message string, rabbitConn stri
 			Body:        []byte(message),
 		})
 	if err != nil {
-		log.Fatalf("Error al enviar el mensaje: %s", err)
+		logger.GetLogger().Fatal("Error al enviar el mensaje", zap.String("queue", queueName), zap.Error(err))
 	}
 
 }

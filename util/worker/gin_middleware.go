@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/medfriend/shared-commons-go/util/logger"
+	"go.uber.org/zap"
 	"io"
-	"log"
 	"net/http"
 	"time"
 )
@@ -35,7 +36,7 @@ func WorkerPoolMiddleware(pool *WorkerPool, timeoutMillis int64, processorTimeou
 		pool = globalWorkerPool
 		if pool == nil {
 			// Crear un pool por defecto si no existe
-			log.Println("ADVERTENCIA: Creando WorkerPool por defecto en el middleware")
+			logger.GetLogger().Warn("Creando WorkerPool por defecto en el middleware")
 			pool = NewWorkerPool(0, 100) // 0 = usar número de CPUs
 			globalWorkerPool = pool
 		}
@@ -99,15 +100,17 @@ func WorkerPoolMiddleware(pool *WorkerPool, timeoutMillis int64, processorTimeou
 			if ok && workerResp != nil {
 				// En una implementación real, transferirías los datos de la respuesta
 				// a la respuesta de Gin. Por ahora, solo registramos el resultado.
-				log.Printf("Respuesta recibida del worker para: %s (status: %s)",
-				    c.Request.URL.Path, workerResp.Status)
+				logger.GetLogger().Info("Respuesta recibida del worker",
+					zap.String("path", c.Request.URL.Path),
+					zap.String("status", workerResp.Status))
 			}
 		case <-timeoutChan:
 			// El timeout del middleware es más corto que el del worker, lo que permite
 			// que los workers continúen trabajando en segundo plano mientras liberamos
 			// el hilo de procesamiento HTTP
-			log.Printf("Middleware avanzando sin esperar al worker para: %s (el worker sigue procesando en segundo plano)", 
-			    c.Request.URL.Path)
+			logger.GetLogger().Info("Middleware avanzando sin esperar al worker",
+				zap.String("path", c.Request.URL.Path),
+				zap.String("note", "el worker sigue procesando en segundo plano"))
 		}
 
 		// Continuar con la cadena de middleware normal
@@ -121,7 +124,7 @@ func TrazabilidadMiddleware(pool *WorkerPool) gin.HandlerFunc {
 	if pool == nil {
 		pool = globalWorkerPool
 		if pool == nil {
-			log.Println("ADVERTENCIA: TrazabilidadMiddleware requiere un WorkerPool configurado")
+			logger.GetLogger().Warn("TrazabilidadMiddleware requiere un WorkerPool configurado")
 			return func(c *gin.Context) { c.Next() } // Middleware nulo si no hay pool
 		}
 	}
@@ -174,12 +177,12 @@ func LoggingMiddleware() gin.HandlerFunc {
 		latency := endTime.Sub(startTime)
 
 		// Registrar detalles
-		log.Printf("[%s] %s %s %d %s",
-			c.Request.Method,
-			c.Request.URL.Path,
-			c.ClientIP(),
-			c.Writer.Status(),
-			latency,
+		logger.GetLogger().Info("HTTP Request",
+			zap.String("method", c.Request.Method),
+			zap.String("path", c.Request.URL.Path),
+			zap.String("client_ip", c.ClientIP()),
+			zap.Int("status", c.Writer.Status()),
+			zap.Duration("latency", latency),
 		)
 	}
 }

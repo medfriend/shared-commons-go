@@ -3,11 +3,12 @@ package httpServer
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/medfriend/shared-commons-go/util/logger"
 	"github.com/medfriend/shared-commons-go/util/worker"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"log"
 	"net/http"
 	"time"
 )
@@ -44,9 +45,9 @@ func InitHttpServerWithWorkerPool(workerPool *worker.WorkerPool, db *gorm.DB, se
 	{
 		// Usar el middleware de worker compartido, excluyendo rutas de salud/métricas
 		apiProcessingGroup.Use(worker.WorkerPoolMiddleware(
-			workerPool,                                  // pool a usar
-			5000,                                        // timeout middleware en ms
-			30000,                                       // timeout procesamiento en ms
+			workerPool, // pool a usar
+			5000,       // timeout middleware en ms
+			30000,      // timeout procesamiento en ms
 			[]string{"/health", "/metrics", "/swagger"}, // rutas a excluir
 		))
 
@@ -78,8 +79,9 @@ func InitHttpServerWithWorkerPool(workerPool *worker.WorkerPool, db *gorm.DB, se
 	api.GET("/metrics", worker.MetricsEndpoint(workerPool))
 
 	// Iniciar el servidor HTTP
-	log.Printf("Iniciando servidor en puerto %s con %d workers disponibles",
-		serviceInfo["SERVICE_PORT"], len(workerPool.Workers))
+	logger.GetLogger().Info("Iniciando servidor HTTP",
+		zap.String("puerto", serviceInfo["SERVICE_PORT"]),
+		zap.Int("workers_disponibles", len(workerPool.Workers)))
 
 	return r, api
 }

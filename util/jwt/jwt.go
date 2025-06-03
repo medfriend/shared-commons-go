@@ -2,8 +2,9 @@ package jwt
 
 import (
 	"errors"
-	"fmt"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/medfriend/shared-commons-go/util/logger"
+	"go.uber.org/zap"
 	"os"
 	"strings"
 )
@@ -40,7 +41,7 @@ func splitToken(tokenString string) (string, error) {
 	parts := strings.Split(tokenString, " ")
 
 	if len(parts) != 2 || parts[0] != "Bearer" {
-		fmt.Println("token invalido")
+		logger.GetLogger().Warn("Token inválido recibido", zap.String("token", tokenString))
 		return "", errors.New("token invalido")
 	}
 

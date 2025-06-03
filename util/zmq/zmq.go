@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"github.com/hashicorp/consul/api"
 	"github.com/medfriend/shared-commons-go/util/consul"
+	"github.com/medfriend/shared-commons-go/util/logger"
 	"github.com/pebbe/zmq4"
+	"go.uber.org/zap"
 )
 
 func ConnZMQ(consulClient *api.Client, service string) (*zmq4.Socket, error) {
@@ -37,7 +39,7 @@ func ConnZMQ(consulClient *api.Client, service string) (*zmq4.Socket, error) {
 		return nil, err
 	}
 
-	fmt.Println(fmt.Sprintf("Connected to %s", zmqConn))
+	logger.GetLogger().Info("Conectado a ZMQ", zap.String("endpoint", zmqConn))
 
 	return socket, nil
 }

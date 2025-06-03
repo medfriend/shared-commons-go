@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/hashicorp/consul/api"
-	"log"
+	"github.com/medfriend/shared-commons-go/util/logger"
+	"go.uber.org/zap"
 	"net/http"
 	"os"
 	"strconv"
@@ -15,7 +16,7 @@ func handleString2int(data string) int {
 	converted, err := strconv.Atoi(data)
 
 	if err != nil {
-		log.Fatal(err)
+		logger.GetLogger().Fatal("Error al convertir string a int", zap.Error(err))
 	}
 
 	return converted
@@ -29,7 +30,7 @@ func ConnectToConsulKey(addressDeploy, key string) *api.Client {
 		config.Address = addressDeploy
 	} else {
 		// Usar la configuración por defecto de Consul
-		log.Println("Usando configuración por defecto de Consul:", config.Address)
+		logger.GetLogger().Info("Usando configuración por defecto de Consul", zap.String("address", config.Address))
 	}
 
 	client, err := api.NewClient(config)
@@ -41,7 +42,7 @@ func ConnectToConsulKey(addressDeploy, key string) *api.Client {
 	err = json.Unmarshal([]byte(dbString), &result)
 
 	if err != nil {
-		log.Fatalf("Error converting JSON string to map: %v", err)
+		logger.GetLogger().Fatal("Error converting JSON string to map", zap.Error(err))
 	}
 
 	service := &api.AgentServiceRegistration{
@@ -59,10 +60,10 @@ func ConnectToConsulKey(addressDeploy, key string) *api.Client {
 	err = client.Agent().ServiceRegister(service)
 
 	if err != nil {
-		log.Fatalf("Error registering service: %v", err)
+		logger.GetLogger().Fatal("Error registering service", zap.Error(err))
 	}
 
-	fmt.Println("Service registered successfully")
+	logger.GetLogger().Info("Service registered successfully")
 
 	return client
 }
@@ -75,13 +76,13 @@ func ConnectToConsul(addressDeploy string) *api.Client {
 		config.Address = addressDeploy
 	} else {
 		// Usar la configuración por defecto de Consul
-		log.Println("Usando configuración por defecto de Consul:", config.Address)
+		logger.GetLogger().Info("Usando configuración por defecto de Consul", zap.String("address", config.Address))
 	}
 
 	client, err := api.NewClient(config)
 
 	if err != nil {
-		log.Fatalf("Error creating consul client: %v", err)
+		logger.GetLogger().Fatal("Error creating consul client", zap.Error(err))
 	}
 
 	serviceID := os.Getenv("SERVICE_ID")
@@ -90,12 +91,12 @@ func ConnectToConsul(addressDeploy string) *api.Client {
 	servicePort := os.Getenv("SERVICE_PORT")
 
 	if serviceID == "" || serviceName == "" || serviceAddress == "" || servicePort == "" {
-		log.Fatalf("Missing required environment variables")
+		logger.GetLogger().Fatal("Missing required environment variables")
 	}
 
 	port, err := strconv.Atoi(servicePort)
 	if err != nil {
-		log.Fatalf("Error converting SERVICE_PORT to int: %v", err)
+		logger.GetLogger().Fatal("Error converting SERVICE_PORT to int", zap.Error(err))
 	}
 
 	service := &api.AgentServiceRegistration{
@@ -113,10 +114,10 @@ func ConnectToConsul(addressDeploy string) *api.Client {
 	err = client.Agent().ServiceRegister(service)
 
 	if err != nil {
-		log.Fatalf("Error registering service: %v", err)
+		logger.GetLogger().Fatal("Error registering service", zap.Error(err))
 	}
 
-	fmt.Println("Service registered successfully")
+	logger.GetLogger().Info("Service registered successfully")
 
 	return client
 }
@@ -139,7 +140,7 @@ func GetServiceAddressAndPort(client *api.Client, serviceName string) (string, i
 
 	service := services[0]
 
-	fmt.Println(service.ServiceName)
+	logger.GetLogger().Debug("Service name found", zap.String("service_name", service.ServiceName))
 
 	parts := strings.Split(service.ServiceName, "-")
 	dbString, _ := GetKeyValue(client, strings.ToUpper(parts[1]))
@@ -165,7 +166,7 @@ func StoreKeyValue(client *api.Client, key string, value string) error {
 		return fmt.Errorf("error storing key-value pair in Consul: %v", err)
 	}
 
-	fmt.Printf("Stored key-value pair: %s=%s\n", key, value)
+	logger.GetLogger().Info("Stored key-value pair", zap.String("key", key), zap.String("value", value))
 	return nil
 }
 
@@ -182,6 +183,6 @@ func GetKeyValue(client *api.Client, key string) (string, error) {
 	}
 
 	value := string(pair.Value)
-	fmt.Printf("Retrieved key-value pair: %s=%s\n", key, value)
+	logger.GetLogger().Info("Retrieved key-value pair", zap.String("key", key), zap.String("value", value))
 	return value, nil
 }

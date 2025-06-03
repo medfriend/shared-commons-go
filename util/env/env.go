@@ -2,12 +2,13 @@ package env
 
 import (
 	"github.com/joho/godotenv"
-	"log"
+	"github.com/medfriend/shared-commons-go/util/logger"
+	"go.uber.org/zap"
 )
 
 func LoadEnv() {
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		logger.GetLogger().Fatal("Error loading .env file", zap.Error(err))
 	}
 }

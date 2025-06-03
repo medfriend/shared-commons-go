@@ -3,6 +3,8 @@ package repository
 import (
 	"fmt"
 	"github.com/medfriend/shared-commons-go/dto"
+	loggerR "github.com/medfriend/shared-commons-go/util/logger"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"math"
 	"reflect"
@@ -14,15 +16,33 @@ type BaseRepository[T any] struct {
 }
 
 func (r *BaseRepository[T]) Pagination(paginacion dto.PaginationDTO) (dto.PaginatedResponse, error) {
+	return r.PaginationWithQuery(paginacion, nil)
+}
 
+// PaginationWithQuery permite aplicar una consulta personalizada además de la paginación
+// El parámetro queryFunc recibe un *gorm.DB y debe retornar un *gorm.DB modificado con las condiciones deseadas
+func (r *BaseRepository[T]) PaginationWithQuery(paginacion dto.PaginationDTO, queryFunc func(*gorm.DB) *gorm.DB) (dto.PaginatedResponse, error) {
 	var entities []T
 	var totalRows int64
 
-	r.DB.Model(new(T)).Count(&totalRows)
+	// Query base
+	query := r.DB.Model(new(T))
+
+	// Aplicar la función de consulta si fue proporcionada
+	if queryFunc != nil {
+		query = queryFunc(query)
+	}
+
+	// Contar registros totales aplicando los filtros
+	query.Count(&totalRows)
+
+	// Calcular offset para paginación
 	offset := (paginacion.Pagina - 1) * paginacion.Filas
 
-	err := r.DB.Limit(int(paginacion.Filas)).Offset(int(offset)).Find(&entities).Error
+	// Aplicar paginación y ejecutar consulta final
+	err := query.Limit(int(paginacion.Filas)).Offset(int(offset)).Find(&entities).Error
 
+	// Calcular páginas totales
 	totalPages := int(math.Ceil(float64(totalRows) / float64(paginacion.Filas)))
 
 	paginacionResponse := dto.PaginatedResponse{
@@ -111,12 +131,15 @@ func (r *BaseRepository[T]) FindByIdWithRelationsAsync(id uint, relations map[st
 	errChan := make(chan error, len(relations)) // Canal para manejar errores en goroutines
 
 	// Cargar la entidad principal sin relaciones
-	fmt.Println("Iniciando carga de la entidad principal...")
+	logger := loggerR.GetLogger()
+	logger.Debug("Iniciando carga de la entidad principal", zap.Uint("id", id))
 	if err := r.DB.First(&entity, id).Error; err != nil {
-		fmt.Printf("Error al cargar la entidad principal con ID %d: %v\n", id, err)
+		logger.Error("Error al cargar la entidad principal",
+			zap.Uint("id", id),
+			zap.Error(err))
 		return nil, err
 	}
-	fmt.Println("Entidad principal cargada exitosamente.")
+	logger.Debug("Entidad principal cargada exitosamente")
 
 	// Obtener un reflejo del valor de la entidad para inspeccionar sus campos
 	entityValue := reflect.ValueOf(&entity).Elem()
@@ -124,25 +147,26 @@ func (r *BaseRepository[T]) FindByIdWithRelationsAsync(id uint, relations map[st
 	// Función para cargar cada relación en paralelo
 	loadRelation := func(rel string) {
 		defer wg.Done()
-		fmt.Printf("Iniciando carga de la relación '%s'...\n", rel)
+		logger := loggerR.GetLogger()
+		logger.Debug("Iniciando carga de relación", zap.String("relacion", rel))
 
 		// Cargar solo la relación en `entity`
 		if err := r.DB.Model(&entity).Preload(rel).Find(&entity).Error; err != nil {
-			fmt.Printf("Error al cargar la relación '%s': %v\n", rel, err)
+			logger.Error("Error al cargar relación",
+				zap.String("relacion", rel),
+				zap.Error(err))
 			errChan <- err // Enviar error al canal si ocurre otro tipo de error
 			return
 		}
-		fmt.Printf("Relación '%s' cargada exitosamente.\n", rel)
+		logger.Debug("Relación cargada exitosamente", zap.String("relacion", rel))
 	}
 
-	fmt.Println(entity)
-	fmt.Println(entityValue)
-
-	fmt.Println("Campos de entityValue:")
 	for i := 0; i < entityValue.NumField(); i++ {
 		field := entityValue.Type().Field(i)
 		value := entityValue.Field(i)
-		fmt.Printf("Campo: %s, Valor: %v\n", field.Name, value)
+		logger.Debug("Campo de entidad",
+			zap.String("campo", field.Name),
+			zap.Any("valor", value.Interface()))
 	}
 
 	// Ejecutar `Preload` solo para las relaciones que no son `nil` en la entidad
@@ -153,7 +177,9 @@ func (r *BaseRepository[T]) FindByIdWithRelationsAsync(id uint, relations map[st
 			wg.Add(1)
 			go loadRelation(relation)
 		} else {
-			fmt.Printf("Relación '%s' es nil o vacía en la entidad (campo: '%s'), se omite el preload.\n", relation, fieldName)
+			logger.Debug("Relación omitida por ser nil o vacía",
+				zap.String("relacion", relation),
+				zap.String("campo", fieldName))
 		}
 	}
 
@@ -166,12 +192,12 @@ func (r *BaseRepository[T]) FindByIdWithRelationsAsync(id uint, relations map[st
 	// Verificar si hubo errores
 	for err := range errChan {
 		if err != nil {
-			fmt.Println("Error encontrado en el canal de errores:", err)
+			logger.Error("Error encontrado en el canal de errores", zap.Error(err))
 			return nil, err // Retornar el primer error encontrado
 		}
 	}
 
-	fmt.Println("Todas las relaciones cargadas exitosamente.")
+	logger.Debug("Todas las relaciones cargadas exitosamente")
 	return &entity, nil
 }
 

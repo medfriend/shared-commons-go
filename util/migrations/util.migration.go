@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/medfriend/shared-commons-go/util/entity"
+	"github.com/medfriend/shared-commons-go/util/logger"
 	"github.com/medfriend/shared-commons-go/util/repository"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"io/ioutil"
 	"path/filepath"
@@ -47,7 +49,7 @@ func ReadMigration(db *gorm.DB) error {
 
 		// Si la migración ya existe, saltamos a la siguiente
 		if migration != nil {
-			fmt.Printf("Migración %s ya aplicada, saltando...\n", nombreArchivo)
+			logger.GetLogger().Info("Migración ya aplicada, saltando", zap.String("archivo", nombreArchivo))
 			continue
 		}
 
@@ -68,7 +70,7 @@ func ReadMigration(db *gorm.DB) error {
 		tx := db.Begin()
 		inicio := time.Now()
 
-		fmt.Printf("Ejecutando migración: %s\n", nombreArchivo)
+		logger.GetLogger().Info("Ejecutando migración", zap.String("archivo", nombreArchivo))
 
 		erroresIgnorados := false
 
@@ -87,8 +89,9 @@ func ReadMigration(db *gorm.DB) error {
 				if strings.Contains(errorStr, "already exists") ||
 					strings.Contains(errorStr, "ya existe") {
 					// Ignorar este error y continuar
-					fmt.Printf("ADVERTENCIA: Ignorando error en sentencia: %s\nError: %s\n",
-						sentencia[:Min(50, len(sentencia))]+"...", errorStr)
+					logger.GetLogger().Warn("Ignorando error en sentencia",
+						zap.String("sentencia", sentencia[:Min(50, len(sentencia))]+"..."),
+						zap.String("error", errorStr))
 					erroresIgnorados = true
 					continue
 				} else {
@@ -120,9 +123,13 @@ func ReadMigration(db *gorm.DB) error {
 		tx.Commit()
 
 		if erroresIgnorados {
-			fmt.Printf("Migración %s aplicada con advertencias en %d ms\n", nombreArchivo, duracion)
+			logger.GetLogger().Warn("Migración aplicada con advertencias",
+				zap.String("archivo", nombreArchivo),
+				zap.Int64("duracion_ms", duracion))
 		} else {
-			fmt.Printf("Migración %s aplicada correctamente en %d ms\n", nombreArchivo, duracion)
+			logger.GetLogger().Info("Migración aplicada correctamente",
+				zap.String("archivo", nombreArchivo),
+				zap.Int64("duracion_ms", duracion))
 		}
 	}
 
