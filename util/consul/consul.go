@@ -183,6 +183,5 @@ func GetKeyValue(client *api.Client, key string) (string, error) {
 	}
 
 	value := string(pair.Value)
-	logger.GetLogger().Info("Retrieved key-value pair", zap.String("key", key), zap.String("value", value))
 	return value, nil
 }
