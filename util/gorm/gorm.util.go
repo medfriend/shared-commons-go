@@ -46,8 +46,6 @@ func InitDB(db *gorm.DB, consulClient *api.Client, connectionType string, servic
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
 		result["DB_HOST"], result["DB_USER"], result["DB_PASSWORD"], result[dbName], result["DB_PORT"])
 
-	logger.GetLogger().Debug("Conectando a la base de datos", zap.String("dsn", dsn))
-
 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		logger.GetLogger().Fatal("No se pudo conectar a la base de datos", zap.Error(err))
@@ -61,8 +59,6 @@ func InitDB(db *gorm.DB, consulClient *api.Client, connectionType string, servic
 	sqlDB.SetMaxOpenConns(HandleString2int(result["MAX_OPEN_CONN"]))                       // Máximo número de conexiones abiertas
 	sqlDB.SetMaxIdleConns(HandleString2int(result["MAX_IDLE_CONN"]))                       // Máximo número de conexiones inactivas
 	sqlDB.SetConnMaxLifetime(time.Duration(HandleString2int(result["MAX_LIFETIME_CONN"]))) // Tiempo de vida máximo de una conexión
-
-	logger.GetLogger().Info("Conexión a la base de datos exitosa")
 
 	return db, nil
 }
