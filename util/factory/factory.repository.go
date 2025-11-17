@@ -580,134 +580,118 @@ func assignPaginationFields(resp interface{}, page, pageSize int, total int64, t
 }
 
 func (r *FactoryRepositoryImpl) Update(table string, upd UpdateDTO) (int64, error) {
-    fmt.Println("[Repo][Update] table:", table)
-    fmt.Println("[Repo][Update] incoming payload:", upd)
-    if err := r.validateIdent(table); err != nil {
-        fmt.Println("[Repo][Update] validateIdent error:", err)
-        return 0, err
-    }
-    if len(upd.Filters) == 0 {
-        fmt.Println("[Repo][Update] no filters provided — refusing to update")
-        return 0, errors.New("se requiere al menos un filtro para actualizar")
-    }
+	if err := r.validateIdent(table); err != nil {
+		return 0, err
+	}
+	if len(upd.Filters) == 0 {
+		return 0, errors.New("se requiere al menos un filtro para actualizar")
+	}
 
 	// Validar columnas a actualizar
-    safeData := map[string]interface{}{}
-    for k, v := range upd.Data {
-        if err := r.validateIdent(k); err != nil {
-            fmt.Println("[Repo][Update] invalid column name:", k, "err:", err)
-            return 0, err
-        }
-        safeData[k] = v
-    }
-    if len(safeData) == 0 {
-        fmt.Println("[Repo][Update] safeData empty — nothing to update")
-        return 0, errors.New("no hay campos válidos para actualizar")
-    }
+	safeData := map[string]interface{}{}
+	for k, v := range upd.Data {
+		if err := r.validateIdent(k); err != nil {
+			return 0, err
+		}
+		safeData[k] = v
+	}
+	if len(safeData) == 0 {
+		return 0, errors.New("no hay campos válidos para actualizar")
+	}
 
-    qb := r.DB.Table(table)
-    q := QueryDTO{Filters: upd.Filters}
-    fmt.Println("[Repo][Update] building query with filters:", q.Filters)
-    qb, err := r.buildQuery(qb, q, table)
-    if err != nil {
-        fmt.Println("[Repo][Update] buildQuery error:", err)
-        return 0, err
-    }
+	qb := r.DB.Table(table)
+	q := QueryDTO{Filters: upd.Filters}
+	qb, err := r.buildQuery(qb, q, table)
+	if err != nil {
+		return 0, err
+	}
 
-    // Mapa de tipos de columnas
-    colTypes, _ := r.getColumnTypes(table)
-    fmt.Println("[Repo][Update] detected column types:", colTypes)
+	// Mapa de tipos de columnas
+	colTypes, _ := r.getColumnTypes(table)
 
-    // Acumular asignaciones para un único UPDATE
-    updateMap := make(map[string]interface{})
+	// Acumular asignaciones para un único UPDATE
+	updateMap := make(map[string]interface{})
 
 	// Caso legacy: si existen columnas value y (opcional) tipo
-    if val, ok := safeData["value"]; ok {
-        if _, hasValueCol := colTypes["value"]; hasValueCol {
-            var tipoForValidation string
-            if _, hasTipoCol := colTypes["tipo"]; hasTipoCol {
-                if tt, present := safeData["tipo"]; present {
-                    if ts, ok := tt.(string); ok {
-                        tipoForValidation = ts
-                    }
-                }
-                if tipoForValidation == "" {
-                    var count int64
-                    if err := qb.Count(&count).Error; err == nil && count > 0 {
-                        var tipos []string
-                        qbTypes := r.DB.Table(table)
-                        qbTypes, _ = r.buildQuery(qbTypes, q, table)
-                        if err := qbTypes.Distinct().Pluck("tipo", &tipos).Error; err == nil {
-                            uniq := make(map[string]struct{})
-                            for _, t := range tipos {
-                                if t != "" {
-                                    uniq[t] = struct{}{}
-                                }
-                            }
-                            if len(uniq) == 1 {
-                                for k := range uniq {
-                                    tipoForValidation = k
-                                }
-                            }
-                            if len(uniq) > 1 {
-                                fmt.Println("[Repo][Update] ambiguous 'value' update: multiple tipos detected; require 'tipo'")
-                                return 0, errors.New("update con value ambiguo: múltiples tipos; incluye 'tipo'")
-                            }
-                        }
-                    }
-                }
-                if tipoForValidation != "" {
-                    if err := validateValueAgainstTipo(tipoForValidation, val); err != nil {
-                        fmt.Println("[Repo][Update] value/tipo validation error:", err)
-                        return 0, err
-                    }
-                }
-            }
-            // Preparar value como json/jsonb si corresponde (sin ejecutar aún)
-            if t := strings.ToLower(colTypes["value"]); t == "jsonb" || t == "json" {
-                b, err := json.Marshal(val)
-                if err != nil {
-                    fmt.Println("[Repo][Update] marshal value error:", err)
-                    return 0, err
-                }
-                cast := "::jsonb"
-                if t == "json" {
-                    cast = "::json"
-                }
-                updateMap["value"] = gorm.Expr("?"+cast, string(b))
-                delete(safeData, "value")
-            }
-        }
-    }
+	if val, ok := safeData["value"]; ok {
+		if _, hasValueCol := colTypes["value"]; hasValueCol {
+			var tipoForValidation string
+			if _, hasTipoCol := colTypes["tipo"]; hasTipoCol {
+				if tt, present := safeData["tipo"]; present {
+					if ts, ok := tt.(string); ok {
+						tipoForValidation = ts
+					}
+				}
+				if tipoForValidation == "" {
+					var count int64
+					if err := qb.Count(&count).Error; err == nil && count > 0 {
+						var tipos []string
+						qbTypes := r.DB.Table(table)
+						qbTypes, _ = r.buildQuery(qbTypes, q, table)
+						if err := qbTypes.Distinct().Pluck("tipo", &tipos).Error; err == nil {
+							uniq := make(map[string]struct{})
+							for _, t := range tipos {
+								if t != "" {
+									uniq[t] = struct{}{}
+								}
+							}
+							if len(uniq) == 1 {
+								for k := range uniq {
+									tipoForValidation = k
+								}
+							}
+							if len(uniq) > 1 {
+								return 0, errors.New("update con value ambiguo: múltiples tipos; incluye 'tipo'")
+							}
+						}
+					}
+				}
+				if tipoForValidation != "" {
+					if err := validateValueAgainstTipo(tipoForValidation, val); err != nil {
+						return 0, err
+					}
+				}
+			}
+			// Preparar value como json/jsonb si corresponde (sin ejecutar aún)
+			if t := strings.ToLower(colTypes["value"]); t == "jsonb" || t == "json" {
+				b, err := json.Marshal(val)
+				if err != nil {
+					return 0, err
+				}
+				cast := "::jsonb"
+				if t == "json" {
+					cast = "::json"
+				}
+				updateMap["value"] = gorm.Expr("?"+cast, string(b))
+				delete(safeData, "value")
+			}
+		}
+	}
 
-    // Preparar otras columnas json/jsonb o normales en updateMap
-    for k, v := range safeData {
-        t := strings.ToLower(colTypes[k])
-        if t == "json" || t == "jsonb" {
-            b, err := json.Marshal(v)
-            if err != nil {
-                fmt.Println("[Repo][Update] marshal json field error for", k, ":", err)
-                return 0, err
-            }
-            cast := "::jsonb"
-            if t == "json" {
-                cast = "::json"
-            }
-            updateMap[k] = gorm.Expr("?"+cast, string(b))
-        } else {
-            updateMap[k] = v
-        }
-    }
+	// Preparar otras columnas json/jsonb o normales en updateMap
+	for k, v := range safeData {
+		t := strings.ToLower(colTypes[k])
+		if t == "json" || t == "jsonb" {
+			b, err := json.Marshal(v)
+			if err != nil {
+				return 0, err
+			}
+			cast := "::jsonb"
+			if t == "json" {
+				cast = "::json"
+			}
+			updateMap[k] = gorm.Expr("?"+cast, string(b))
+		} else {
+			updateMap[k] = v
+		}
+	}
 
-    if len(updateMap) == 0 {
-        fmt.Println("[Repo][Update] nothing to update after processing — empty updateMap")
-        return 0, errors.New("no hay campos válidos para actualizar")
-    }
+	if len(updateMap) == 0 {
+		return 0, errors.New("no hay campos válidos para actualizar")
+	}
 
-    fmt.Println("[Repo][Update] final updateMap for Updates:", updateMap)
-    tx := qb.Updates(updateMap)
-    fmt.Println("[Repo][Update] RowsAffected:", tx.RowsAffected, "Error:", tx.Error)
-    return tx.RowsAffected, tx.Error
+	tx := qb.Updates(updateMap)
+	return tx.RowsAffected, tx.Error
 }
 
 func (r *FactoryRepositoryImpl) DropTable(table string) error {

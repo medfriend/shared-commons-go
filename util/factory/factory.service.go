@@ -1,8 +1,7 @@
 package factory
 
 import (
-    "fmt"
-    scdto "github.com/medfriend/shared-commons-go/dto"
+	scdto "github.com/medfriend/shared-commons-go/dto"
 )
 
 type FactoryService interface {
@@ -32,11 +31,8 @@ func (s *FactoryServiceImpl) Query(table string, q QueryDTO) (scdto.PaginatedRes
 }
 
 func (s *FactoryServiceImpl) Update(table string, upd UpdateDTO) (int64, error) {
-    fmt.Println("[Service][Update] table:", table)
-    fmt.Println("[Service][Update] payload:", upd)
-    rows, err := s.repo.Update(table, upd)
-    fmt.Println("[Service][Update] repo response rows:", rows, "err:", err)
-    return rows, err
+	rows, err := s.repo.Update(table, upd)
+	return rows, err
 }
 
 func (s *FactoryServiceImpl) DropTable(table string) error {
