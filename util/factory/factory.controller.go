@@ -60,7 +60,7 @@ func (fc *FactoryController) Query(c *gin.Context) {
 // @Param table path string true "Nombre de la tabla"
 // @Param payload body UpdateDTO true "Actualización"
 // @Success 200 {object} map[string]interface{}
-// @Router /factory/Update/{table} [patch]
+// @Router /factory/Update/{table} [post]
 func (fc *FactoryController) Update(c *gin.Context) {
     table := c.Param("table")
     fmt.Println("[Controller][Update] table:", table)

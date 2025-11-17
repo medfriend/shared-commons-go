@@ -13,7 +13,7 @@ func NewFactoryRouter(router *gin.RouterGroup, db *gorm.DB) {
 	group.POST("/CreateTable", factoryController.CreateTable)
 	group.POST("/Insert/:table", factoryController.Insert)
 	group.POST("/Query/:table", factoryController.Query)
-	group.PATCH("/Update/:table", factoryController.Update)
+    group.POST("/Update/:table", factoryController.Update)
 	group.DELETE("/Delete/:table", factoryController.Delete)
 	group.DELETE("/DropTable/:table", factoryController.DropTable)
 	group.POST("/Relation", factoryController.Relation)
