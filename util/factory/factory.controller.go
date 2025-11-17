@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	ctrlutil "github.com/medfriend/shared-commons-go/util/controller"
 )
@@ -61,16 +62,20 @@ func (fc *FactoryController) Query(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /factory/Update/{table} [patch]
 func (fc *FactoryController) Update(c *gin.Context) {
-	table := c.Param("table")
-	var upd UpdateDTO
-	if ctrlutil.HandlerBindJson(c, &upd) {
-		return
-	}
-	rows, err := fc.svc.Update(table, upd)
-	if ctrlutil.HandlerInternalError(c, err) {
-		return
-	}
-	ctrlutil.HandlerCreatedSuccess(c, map[string]interface{}{"updated": rows}, 0)
+    table := c.Param("table")
+    fmt.Println("[Controller][Update] table:", table)
+    var upd UpdateDTO
+    if ctrlutil.HandlerBindJson(c, &upd) {
+        fmt.Println("[Controller][Update] bind error for table:", table)
+        return
+    }
+    fmt.Println("[Controller][Update] payload:", upd)
+    rows, err := fc.svc.Update(table, upd)
+    fmt.Println("[Controller][Update] service response rows:", rows, "err:", err)
+    if ctrlutil.HandlerInternalError(c, err) {
+        return
+    }
+    ctrlutil.HandlerCreatedSuccess(c, map[string]interface{}{"updated": rows}, 0)
 }
 
 // DropTable @Summary Elimina una tabla completa
