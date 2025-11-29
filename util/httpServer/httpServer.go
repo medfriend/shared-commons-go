@@ -45,9 +45,9 @@ func InitHttpServerWithWorkerPool(workerPool *worker.WorkerPool, db *gorm.DB, se
 	{
 		// Usar el middleware de worker compartido, excluyendo rutas de salud/métricas
 		apiProcessingGroup.Use(worker.WorkerPoolMiddleware(
-			workerPool, // pool a usar
-			5000,       // timeout middleware en ms
-			30000,      // timeout procesamiento en ms
+			workerPool,                                  // pool a usar
+			5000,                                        // timeout middleware en ms
+			30000,                                       // timeout procesamiento en ms
 			[]string{"/health", "/metrics", "/swagger"}, // rutas a excluir
 		))
 
@@ -56,7 +56,7 @@ func InitHttpServerWithWorkerPool(workerPool *worker.WorkerPool, db *gorm.DB, se
 	}
 
 	// Configurar middleware de trazabilidad para todas las rutas
-	r.Use(worker.TrazabilidadMiddleware(workerPool))
+	//r.Use(worker.TrazabilidadMiddleware(workerPool))
 
 	// Agrupar rutas normales bajo el prefijo de servicio
 	api := r.Group(serviceInfo["SERVICE_NAME"])
