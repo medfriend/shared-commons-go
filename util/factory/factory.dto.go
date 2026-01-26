@@ -43,19 +43,48 @@ type FilterCondition struct {
 	Value interface{} `json:"value"`
 }
 
+// FilterGroup permite anidar condiciones con lógica AND/OR
+// Si Logic no se especifica, se usa AND.
+type FilterGroup struct {
+	Logic   string            `json:"logic"`
+	Filters []FilterCondition `json:"filters"`
+	Groups  []FilterGroup     `json:"groups"`
+}
+
+// GRPCEnrichDTO define cómo enriquecer cada fila con una llamada gRPC.
+// Toma una columna de la fila como payload, invoca un método y mapea campos de la respuesta.
+type GRPCEnrichDTO struct {
+	// Method es el método gRPC en formato package.Service/Method.
+	Method string `json:"method"`
+	// PayloadColumn es el nombre de la columna de la fila cuyo valor se envía en el payload.
+	PayloadColumn string `json:"payload_column"`
+	// PayloadKey es la clave dentro del JSON enviado; si se omite, se usa PayloadColumn.
+	PayloadKey string `json:"payload_key"`
+	// ResponseMap mapea rutas JSON de la respuesta (ej: "user.nombres") a nuevos campos en la fila.
+	ResponseMap map[string]string `json:"response_map"`
+	// TimeoutMs opcional; si es 0 se usa el valor por defecto.
+	TimeoutMs int `json:"timeout_ms"`
+	// Target es el target del microservicio a la cual se realizara el enriquesimiento
+	Target *string `json:"target"`
+}
+
 // QueryDTO para lectura con libertad de filtros, selección, orden y paginación
 type QueryDTO struct {
 	Filters []FilterCondition `json:"filters"`
-	Fields  []string          `json:"fields"`
-	Sort    []string          `json:"sort"` // ejemplo: ["-date_created", "variable"]
-	Limit   int               `json:"limit"`
-	Offset  int               `json:"offset"`
+	// Where permite lógica avanzada (AND/OR anidados). Si se envía, reemplaza Filters/Logic.
+	Where  *FilterGroup `json:"where"`
+	Fields []string     `json:"fields"`
+	Sort   []string     `json:"sort"` // ejemplo: ["-date_created", "variable"]
+	Limit  int          `json:"limit"`
+	Offset int          `json:"offset"`
 	// Logic define cómo combinar los filtros a nivel superior: "AND" (por defecto) o "OR"
 	Logic string `json:"logic"`
 	// Joins permite unir tablas adicionales. Los campos y filtros pueden referenciar alias: "alias.campo"
 	Joins []JoinDTO `json:"joins"`
 	// Pagined activa paginación por página y tamaño. Si se provee, sobreescribe limit/offset.
 	Pagined *PaginedDTO `json:"pagined"`
+	// GRPCEnrich permite invocar gRPC por fila y agregar campos con la respuesta.
+	GRPCEnrich []GRPCEnrichDTO `json:"grpc_enrich"`
 }
 
 // JoinDTO describe una unión con otra tabla

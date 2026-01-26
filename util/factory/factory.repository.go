@@ -1,18 +1,21 @@
 package factory
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	scdto "github.com/medfriend/shared-commons-go/dto"
+	localgrpc "github.com/medfriend/shared-commons-go/util/grpc"
+	loggerR "github.com/medfriend/shared-commons-go/util/logger"
+	baseRepo "github.com/medfriend/shared-commons-go/util/repository"
+	"google.golang.org/grpc"
+	"gorm.io/gorm"
 	"math"
 	"reflect"
 	"regexp"
 	"strings"
 	"time"
-
-	scdto "github.com/medfriend/shared-commons-go/dto"
-	baseRepo "github.com/medfriend/shared-commons-go/util/repository"
-	"gorm.io/gorm"
 )
 
 // FactoryRepository define operaciones CRUD/DDL dinámicas estilo Directus.
@@ -44,6 +47,8 @@ var allowedTipos = map[string]struct{}{
 	"datetime": {},
 	"json":     {},
 }
+
+const defaultGRPCTimeout = 2 * time.Second
 
 func normalizeTipo(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
 
@@ -286,46 +291,56 @@ func (r *FactoryRepositoryImpl) buildQuery(qb *gorm.DB, q QueryDTO, table string
 		qb = qb.Select(strings.Join(fields, ", "))
 	}
 
-	// Filtros (AND por defecto; OR si q.Logic == "OR")
-	logic := strings.ToUpper(strings.TrimSpace(q.Logic))
-	if logic == "OR" && len(q.Filters) > 0 {
-		type clause struct {
-			sql  string
-			args []interface{}
+	// Filtros (soporta lógica simple con Logic o anidada con Where)
+	if q.Where != nil {
+		groupSQL, args, err := r.buildGroupSQL(*q.Where, baseAlias)
+		if err != nil {
+			return nil, err
 		}
-		clauses := make([]clause, 0, len(q.Filters))
-		for _, f := range q.Filters {
-			if err := r.validateQualified(f.Field); err != nil {
-				return nil, err
-			}
-			sql, args, err := r.filterToClause(f, baseAlias)
-			if err != nil {
-				return nil, err
-			}
-			clauses = append(clauses, clause{sql: sql, args: args})
+		if groupSQL != "" {
+			qb = qb.Where(groupSQL, args...)
 		}
-		qb = qb.Where(func(tx *gorm.DB) *gorm.DB {
-			first := true
-			for _, c := range clauses {
-				if first {
-					tx = tx.Where(c.sql, c.args...)
-					first = false
-				} else {
-					tx = tx.Or(c.sql, c.args...)
-				}
-			}
-			return tx
-		})
 	} else {
-		for _, f := range q.Filters {
-			if err := r.validateQualified(f.Field); err != nil {
-				return nil, err
+		logic := strings.ToUpper(strings.TrimSpace(q.Logic))
+		if logic == "OR" && len(q.Filters) > 0 {
+			type clause struct {
+				sql  string
+				args []interface{}
 			}
-			sql, args, err := r.filterToClause(f, baseAlias)
-			if err != nil {
-				return nil, err
+			clauses := make([]clause, 0, len(q.Filters))
+			for _, f := range q.Filters {
+				if err := r.validateQualified(f.Field); err != nil {
+					return nil, err
+				}
+				sql, args, err := r.filterToClause(f, baseAlias)
+				if err != nil {
+					return nil, err
+				}
+				clauses = append(clauses, clause{sql: sql, args: args})
 			}
-			qb = qb.Where(sql, args...)
+			qb = qb.Where(func(tx *gorm.DB) *gorm.DB {
+				first := true
+				for _, c := range clauses {
+					if first {
+						tx = tx.Where(c.sql, c.args...)
+						first = false
+					} else {
+						tx = tx.Or(c.sql, c.args...)
+					}
+				}
+				return tx
+			})
+		} else {
+			for _, f := range q.Filters {
+				if err := r.validateQualified(f.Field); err != nil {
+					return nil, err
+				}
+				sql, args, err := r.filterToClause(f, baseAlias)
+				if err != nil {
+					return nil, err
+				}
+				qb = qb.Where(sql, args...)
+			}
 		}
 	}
 
@@ -360,6 +375,50 @@ func (r *FactoryRepositoryImpl) buildQuery(qb *gorm.DB, q QueryDTO, table string
 	}
 
 	return qb, nil
+}
+
+// buildGroupSQL convierte un árbol de filtros AND/OR en una expresión SQL con sus args
+func (r *FactoryRepositoryImpl) buildGroupSQL(group FilterGroup, baseAlias string) (string, []interface{}, error) {
+	logic := strings.ToUpper(strings.TrimSpace(group.Logic))
+	if logic != "OR" {
+		logic = "AND"
+	}
+
+	parts := make([]string, 0, len(group.Filters)+len(group.Groups))
+	args := make([]interface{}, 0)
+
+	for _, f := range group.Filters {
+		if err := r.validateQualified(f.Field); err != nil {
+			return "", nil, err
+		}
+		sql, fArgs, err := r.filterToClause(f, baseAlias)
+		if err != nil {
+			return "", nil, err
+		}
+		parts = append(parts, "("+sql+")")
+		args = append(args, fArgs...)
+	}
+
+	for _, sub := range group.Groups {
+		subSQL, subArgs, err := r.buildGroupSQL(sub, baseAlias)
+		if err != nil {
+			return "", nil, err
+		}
+		if subSQL != "" {
+			parts = append(parts, "("+subSQL+")")
+			args = append(args, subArgs...)
+		}
+	}
+
+	if len(parts) == 0 {
+		return "", args, nil
+	}
+
+	joiner := " AND "
+	if logic == "OR" {
+		joiner = " OR "
+	}
+	return strings.Join(parts, joiner), args, nil
 }
 
 // filterToClause convierte un filtro en un fragmento SQL y sus argumentos
@@ -541,12 +600,91 @@ func (r *FactoryRepositoryImpl) Query(table string, q QueryDTO) (scdto.Paginated
 		return scdto.PaginatedResponse{}, err
 	}
 
+	if len(q.GRPCEnrich) > 0 && len(results) > 0 {
+		r.applyGRPCEnrichments(q.GRPCEnrich, results)
+	}
+
 	var resp scdto.PaginatedResponse
 	resp.Data = results
 	if pageSize > 0 {
 		assignPaginationFields(&resp, page, pageSize, total, totalPages)
 	}
 	return resp, nil
+}
+
+// applyGRPCEnrichments recorre las filas y agrega campos usando llamadas gRPC declaradas en la consulta.
+func (r *FactoryRepositoryImpl) applyGRPCEnrichments(cfgs []GRPCEnrichDTO, rows []map[string]interface{}) {
+	logger := loggerR.GetLogger()
+
+	logger.Info(fmt.Sprintf("informacion del target enviado %s", *cfgs[0].Target))
+
+	var conn *grpc.ClientConn
+
+	if cfgs[0].Target != nil {
+		conn = localgrpc.GetGRPCInstances(*cfgs[0].Target, logger).GetConn()
+	} else {
+		conn = localgrpc.GetGRPCInstances("security", logger).GetConn()
+	}
+
+	if conn == nil {
+		logger.Warn("factory grpc enrich: conexión gRPC no disponible, se omite")
+		return
+	}
+
+	for _, cfg := range cfgs {
+		if cfg.Method == "" || cfg.PayloadColumn == "" || len(cfg.ResponseMap) == 0 {
+			logger.Warn("factory grpc enrich: configuración incompleta, se omite")
+			continue
+		}
+
+		payloadKey := cfg.PayloadKey
+		if payloadKey == "" {
+			payloadKey = cfg.PayloadColumn
+		}
+		timeout := defaultGRPCTimeout
+		if cfg.TimeoutMs > 0 {
+			timeout = time.Duration(cfg.TimeoutMs) * time.Millisecond
+		}
+
+		for i := range rows {
+			row := rows[i]
+			val, ok := row[cfg.PayloadColumn]
+			if !ok || val == nil {
+				continue
+			}
+
+			body, err := json.Marshal(map[string]interface{}{payloadKey: normalizePayloadValue(val)})
+			if err != nil {
+				logger.Warn("factory grpc enrich: error armando payload")
+				continue
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			jsonResp, err := localgrpc.CallJSON(ctx, conn, cfg.Method, body)
+			cancel()
+			if err != nil {
+				logger.Warn("factory grpc enrich: llamada gRPC falló")
+				continue
+			}
+
+			var decoded map[string]interface{}
+			if err := json.Unmarshal([]byte(jsonResp), &decoded); err != nil {
+				logger.Warn("factory grpc enrich: error parseando respuesta")
+				continue
+			}
+
+			for src, dst := range cfg.ResponseMap {
+				if dst == "" || src == "" {
+					continue
+				}
+				if v, ok := extractJSONPath(decoded, src); ok {
+					row[dst] = v
+				} else {
+					row[dst] = nil
+				}
+			}
+		}
+	}
 }
 
 // assignPaginationFields intenta asignar page, pageSize, total y totalPages si existen en el struct
@@ -579,6 +717,36 @@ func assignPaginationFields(resp interface{}, page, pageSize int, total int64, t
 	setInt("TotalPages", totalPages)
 }
 
+// extractJSONPath navega un mapa usando rutas con puntos (ej: "user.nombres").
+func extractJSONPath(m map[string]interface{}, path string) (interface{}, bool) {
+	if path == "" {
+		return m, true
+	}
+	current := interface{}(m)
+	for _, part := range strings.Split(path, ".") {
+		obj, ok := current.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		val, exists := obj[part]
+		if !exists {
+			return nil, false
+		}
+		current = val
+	}
+	return current, true
+}
+
+// normalizePayloadValue convierte []byte en string para evitar base64 en JSON.
+func normalizePayloadValue(v interface{}) interface{} {
+	switch t := v.(type) {
+	case []byte:
+		return string(t)
+	default:
+		return t
+	}
+}
+
 func (r *FactoryRepositoryImpl) Update(table string, upd UpdateDTO) (int64, error) {
 	if err := r.validateIdent(table); err != nil {
 		return 0, err
@@ -608,9 +776,6 @@ func (r *FactoryRepositoryImpl) Update(table string, upd UpdateDTO) (int64, erro
 
 	// Mapa de tipos de columnas
 	colTypes, _ := r.getColumnTypes(table)
-
-	// Acumular asignaciones para un único UPDATE
-	updateMap := make(map[string]interface{})
 
 	// Caso legacy: si existen columnas value y (opcional) tipo
 	if val, ok := safeData["value"]; ok {
@@ -652,7 +817,7 @@ func (r *FactoryRepositoryImpl) Update(table string, upd UpdateDTO) (int64, erro
 					}
 				}
 			}
-			// Preparar value como json/jsonb si corresponde (sin ejecutar aún)
+			// Persistir value como json/jsonb si corresponde
 			if t := strings.ToLower(colTypes["value"]); t == "jsonb" || t == "json" {
 				b, err := json.Marshal(val)
 				if err != nil {
@@ -662,13 +827,15 @@ func (r *FactoryRepositoryImpl) Update(table string, upd UpdateDTO) (int64, erro
 				if t == "json" {
 					cast = "::json"
 				}
-				updateMap["value"] = gorm.Expr("?"+cast, string(b))
+				if err := qb.Update("value", gorm.Expr("?"+cast, string(b))).Error; err != nil {
+					return 0, err
+				}
 				delete(safeData, "value")
 			}
 		}
 	}
 
-	// Preparar otras columnas json/jsonb o normales en updateMap
+	// Manejar otras columnas json/jsonb
 	for k, v := range safeData {
 		t := strings.ToLower(colTypes[k])
 		if t == "json" || t == "jsonb" {
@@ -680,17 +847,14 @@ func (r *FactoryRepositoryImpl) Update(table string, upd UpdateDTO) (int64, erro
 			if t == "json" {
 				cast = "::json"
 			}
-			updateMap[k] = gorm.Expr("?"+cast, string(b))
-		} else {
-			updateMap[k] = v
+			if err := qb.Update(k, gorm.Expr("?"+cast, string(b))).Error; err != nil {
+				return 0, err
+			}
+			delete(safeData, k)
 		}
 	}
 
-	if len(updateMap) == 0 {
-		return 0, errors.New("no hay campos válidos para actualizar")
-	}
-
-	tx := qb.Updates(updateMap)
+	tx := qb.Updates(safeData)
 	return tx.RowsAffected, tx.Error
 }
 
