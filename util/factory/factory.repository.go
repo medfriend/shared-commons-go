@@ -14,6 +14,7 @@ import (
 	"math"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -1022,23 +1023,55 @@ func (r *FactoryRepositoryImpl) Insert(table string, data map[string]interface{}
 
 	// Intentar devolver PK si existe (no se asume nombre 'id')
 	pkCol, pkType, _ := r.getPrimaryKeyInfo(table)
+	fmt.Println(pkType)
+	// Fallback: si no detectamos PK pero existe columna id, intentar usarla
+	if pkCol == "" {
+		if t, ok := colTypes["id"]; ok {
+			pkCol = "id"
+			pkType = strings.ToLower(t)
+		}
+	}
 	if pkCol != "" {
 		sql := fmt.Sprintf("INSERT INTO \"%s\" (%s) VALUES (%s) RETURNING \"%s\";", table, strings.Join(cols, ","), strings.Join(placeholders, ","), pkCol)
-		// Tipos enteros soportados para retorno numérico
-		switch pkType {
-		case "bigint", "integer", "smallint", "serial", "bigserial":
-			var id uint64
-			if err := r.DB.Raw(sql, args...).Scan(&id).Error; err != nil {
-				return 0, err
-			}
-			return id, nil
-		default:
-			var _dummy string
-			if err := r.DB.Raw(sql, args...).Scan(&_dummy).Error; err != nil {
-				return 0, err
-			}
-			return 0, nil
+		var raw interface{}
+		if err := r.DB.Raw(sql, args...).Row().Scan(&raw); err != nil {
+			return 0, err
 		}
+		// Normalizar a uint64 para PK numéricas (soporta int*/uint*/string/[]byte)
+		switch v := raw.(type) {
+		case int64:
+			return uint64(v), nil
+		case int32:
+			return uint64(v), nil
+		case int:
+			return uint64(v), nil
+		case uint64:
+			return v, nil
+		case uint32:
+			return uint64(v), nil
+		case uint:
+			return uint64(v), nil
+		case float64:
+			if v >= 0 && math.Mod(v, 1) == 0 {
+				return uint64(v), nil
+			}
+		case []byte:
+			if n, err := strconv.ParseUint(string(v), 10, 64); err == nil {
+				return n, nil
+			}
+		case string:
+			if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+				return n, nil
+			}
+		default:
+			if s := fmt.Sprint(v); s != "" {
+				if n, err := strconv.ParseUint(s, 10, 64); err == nil {
+					return n, nil
+				}
+			}
+		}
+		// Para PK no numéricas, se mantiene retorno 0
+		return 0, nil
 	}
 	// Sin PK conocida: ejecutar sin RETURNING
 	execSQL := fmt.Sprintf("INSERT INTO \"%s\" (%s) VALUES (%s);", table, strings.Join(cols, ","), strings.Join(placeholders, ","))
