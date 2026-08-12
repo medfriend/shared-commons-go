@@ -3,7 +3,6 @@ package minio
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/hashicorp/consul/api"
 	"github.com/medfriend/shared-commons-go/util/consul"
 	"github.com/medfriend/shared-commons-go/util/logger"
