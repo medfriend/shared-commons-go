@@ -25,7 +25,8 @@ func CONN(consulClient *api.Client) *minio.Client {
 	secretAccessKey := minioInfoResult["MINIO_SECRET"]
 	useSSL := false
 
-	logger.GetLogger().Debug("Información MinIO obtenida", zap.Any("config", minioInfoResult))
+	// Solo el destino: la ficha trae MINIO_ACCESS y MINIO_SECRET.
+	logger.GetLogger().Debug("Información MinIO obtenida", zap.String("endpoint", endpoint))
 
 	minioClient, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),

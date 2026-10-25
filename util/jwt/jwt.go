@@ -88,7 +88,8 @@ func splitToken(tokenString string) (string, error) {
 	parts := strings.Split(tokenString, " ")
 
 	if len(parts) != 2 || parts[0] != "Bearer" {
-		logger.GetLogger().Warn("Token inválido recibido", zap.String("token", tokenString))
+		// Solo el largo: un token mal formado puede ser un token valido sin "Bearer ".
+		logger.GetLogger().Warn("Token inválido recibido", zap.Int("largo", len(tokenString)))
 		return "", errors.New("token invalido")
 	}
 

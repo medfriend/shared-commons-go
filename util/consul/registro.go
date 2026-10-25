@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/consul/api"
 )
@@ -17,6 +18,9 @@ const (
 	FichaAddress    = "SERVICE_ADDRESS"
 	FichaPort       = "SERVICE_PORT"
 	FichaHealthPath = "SERVICE_HEALTH_PATH"
+	// FichaHealthTTL (ej. "30s") es el chequeo de los workers sin HTTP: el proceso avisa
+	// a Consul cada tercio del TTL; si muere, el chequeo vence y pasa a critical.
+	FichaHealthTTL = "SERVICE_HEALTH_TTL"
 )
 
 // Valores del chequeo de salud. DeregisterAfter saca del catalogo una instancia que
@@ -49,7 +53,8 @@ func ParseFicha(key string, raw string) (Ficha, error) {
 //
 // El chequeo HTTP solo se agrega si la ficha trae SERVICE_HEALTH_PATH: un servicio sin
 // ese campo queda como hasta ahora (sin chequeo, siempre "passing"), asi nada deja de
-// enrutarse por cambiar la libreria.
+// enrutarse por cambiar la libreria. Sin health path, SERVICE_HEALTH_TTL agrega un
+// chequeo por latido que no necesita direccion (workers de RabbitMQ/ZMQ).
 func (f Ficha) Registration() (*api.AgentServiceRegistration, error) {
 	port, err := strconv.Atoi(f[FichaPort])
 	if err != nil || port <= 0 {
@@ -79,8 +84,49 @@ func (f Ficha) Registration() (*api.AgentServiceRegistration, error) {
 			Timeout:                        healthTimeout,
 			DeregisterCriticalServiceAfter: healthDeregisterAfter,
 		}
+	} else if ttl, ok, err := f.healthTTL(); err != nil {
+		return nil, err
+	} else if ok {
+		reg.Check = &api.AgentServiceCheck{
+			CheckID:                        ttlCheckID(serviceID(reg)),
+			Name:                           serviceID(reg) + " latido",
+			TTL:                            ttl.String(),
+			DeregisterCriticalServiceAfter: healthDeregisterAfter,
+		}
 	}
 	return reg, nil
+}
+
+// healthTTL lee SERVICE_HEALTH_TTL. ok=false si no esta; menos de 3 s es error porque
+// el latido va cada tercio y Consul no lo distingue de la red.
+func (f Ficha) healthTTL() (time.Duration, bool, error) {
+	raw := strings.TrimSpace(f[FichaHealthTTL])
+	if raw == "" {
+		return 0, false, nil
+	}
+	ttl, err := time.ParseDuration(raw)
+	if err != nil || ttl < 3*time.Second {
+		return 0, false, fmt.Errorf("consul: SERVICE_HEALTH_TTL invalido %q (minimo 3s)", raw)
+	}
+	return ttl, true, nil
+}
+
+func ttlCheckID(id string) string {
+	return "service:" + id + ":ttl"
+}
+
+// Latir marca el chequeo TTL como passing cada ttl/3 hasta que el proceso termina. El
+// primer latido va enseguida: el chequeo nace critical hasta recibirlo.
+func Latir(client *api.Client, id string, ttl time.Duration, onError func(error)) {
+	checkID := ttlCheckID(id)
+	tick := time.NewTicker(ttl / 3)
+	defer tick.Stop()
+	for {
+		if err := client.Agent().UpdateTTL(checkID, "ok", api.HealthPassing); err != nil && onError != nil {
+			onError(err)
+		}
+		<-tick.C
+	}
 }
 
 // serviceID es el ID con que queda el registro: Consul usa el nombre si no hay ID.

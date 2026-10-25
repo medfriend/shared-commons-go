@@ -44,9 +44,17 @@ func Connect(addressDeploy, key string) (*api.Client, Ficha, error) {
 		return nil, nil, err
 	}
 
+	ttl, conLatido, _ := ficha.healthTTL()
+	if conLatido && ficha[FichaHealthPath] == "" {
+		go Latir(client, id, ttl, func(err error) {
+			logger.GetLogger().Warn("Latido a Consul fallido", zap.String("service_id", id), zap.Error(err))
+		})
+	}
+
 	logger.GetLogger().Info("Service registered successfully",
 		zap.String("service_id", id),
-		zap.Bool("health_check", ficha[FichaHealthPath] != ""))
+		zap.Bool("health_check", ficha[FichaHealthPath] != ""),
+		zap.Bool("health_ttl", conLatido && ficha[FichaHealthPath] == ""))
 
 	return client, ficha, nil
 }
@@ -127,6 +135,18 @@ func StoreKeyValue(client *api.Client, key string, value string) error {
 	return nil
 }
 
+// DeleteKeyValue borra la clave del KV; borrar una clave que no existe no es error.
+func DeleteKeyValue(client *api.Client, key string) error {
+	if _, err := client.KV().Delete(key, nil); err != nil {
+		return fmt.Errorf("error deleting key %s from Consul: %v", key, err)
+	}
+	return nil
+}
+
+// GetKeyValue lee la clave del KV y le completa los secretos (ver Secretos) con las
+// variables de entorno del servicio: cuando el gateway deja de publicarlos, el servicio
+// los sigue recibiendo sin cambiar su codigo. JWT ya no existe en el KV en ese caso y se
+// devuelve JWT_KEY del entorno.
 func GetKeyValue(client *api.Client, key string) (string, error) {
 	kv := client.KV()
 
@@ -135,10 +155,19 @@ func GetKeyValue(client *api.Client, key string) (string, error) {
 		return "", fmt.Errorf("error retrieving key-value pair from Consul: %v", err)
 	}
 
-	if pair == nil {
-		return "", fmt.Errorf("key %s not found in Consul", key)
+	value := ""
+	if pair != nil {
+		value = string(pair.Value)
 	}
 
-	value := string(pair.Value)
-	return value, nil
+	completo, faltan := conSecretosDelEntorno(key, value)
+	if len(faltan) > 0 {
+		logger.GetLogger().Warn("Secreto sin valor: definir la variable en el entorno del servicio",
+			zap.String("key", key), zap.Strings("variables", faltan))
+	}
+
+	if pair == nil && completo == "" {
+		return "", fmt.Errorf("key %s not found in Consul", key)
+	}
+	return completo, nil
 }
